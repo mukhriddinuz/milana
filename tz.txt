@@ -1,0 +1,19 @@
+Bu bot asosan milana textile uchun online do'kon sifatida yatarilmoqda.
+
+Asosiy qiladigan ishlari:
+
+ai orqali mijozlarga bilan ishlash yani mijoz sizlarda ushbu rangli kiyimdan bormi deb so'rasa bazadan tekshirib javob berish bor yoki yo'qligi haqida aniq malumot berish kerak 
+va korxona xaqida ham so'ralgan malumotlarga hamda kiyinlar haqidagi malumotlarga javob berib borishi kerak 
+
+uch xil bo'lim bo'lib u bo'limda erkaklar , ayollar , bolalar kiyimlar bo'ladi
+har bir bo'limda o'ziga tegishli mahsulotlar bo'ladi , 
+ai yordamida ushbu bo'limlarda qidirish bo'lishi kerak , 
+masalan biror mijoz farzandi uchun kiyim tanlamoqda menga bahorga mos kiyim kerak kunduzi kiydirish uchun deb so'rasa bazadan rasmlar orqali yokida yozilgan malumotlar orqali tekshirilib mavjud bo'lsa aniq variantlar bilan javob yubora olishi kerak bo'ladi 
+
+va barcha bo'limlarda ham bitta savat ish olib boradi 
+
+bazaga qo'shilgan har bir mahsulot parallel ravishda kanalga ham joylanib borishi u postda maxsulotga o'tish va savatga qo'shish kabi tugmalar bo'lishi kerak va kanaldagi post orqali ham savat o'sha maxsulotdan qo'sha olishshi lozim bo'ladi 
+
+asosiy urg'u bot deyarli barcha ishlarni ai orqali olib borishi faqatgina maxsulotlarni adminlar joylab turishi lozim ai mijozlar bilan suhbat olib borishi maxsulotlarni taklif qilib sotishi mumkin bo'lishi kerak 
+
+bot uch xil tilda o'zbek rus va ingliz tilida ishlashi mumkin bo'lishi kerak mijoz tilni tanlab olgan bo'lsa ai o'sha tilga mos qilib javob berishi kerak bo'ladi 
