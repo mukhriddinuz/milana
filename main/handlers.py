@@ -18,6 +18,9 @@ PRODUCTS_PER_PAGE = 5
 # Vaqtinchalik ma'lumotlar (order jarayoni)
 user_states = {}
 
+# AI chatbot rejimidagi foydalanuvchilar
+ai_mode_users = set()
+
 
 # =============================================
 # /start KOMANDASI
@@ -84,32 +87,57 @@ def handle_change_lang(call):
 def handle_menu_text(message):
     lang = get_user_lang(message.from_user.id)
     text = message.text
+    uid = message.from_user.id
 
     # Bo'limlar
     if text == get_text('btn_men', lang):
+        ai_mode_users.discard(uid)
         show_gender_categories(message.chat.id, 'erkak', lang)
     elif text == get_text('btn_women', lang):
+        ai_mode_users.discard(uid)
         show_gender_categories(message.chat.id, 'ayol', lang)
     elif text == get_text('btn_kids', lang):
+        ai_mode_users.discard(uid)
         show_gender_categories(message.chat.id, 'bola', lang)
     elif text == get_text('btn_cart', lang):
+        ai_mode_users.discard(uid)
         show_cart(message.chat.id, message.from_user.id, lang)
     elif text == get_text('btn_my_orders', lang):
+        ai_mode_users.discard(uid)
         show_orders(message.chat.id, message.from_user.id, lang)
     elif text == get_text('btn_about', lang):
+        ai_mode_users.discard(uid)
         bot.send_message(message.chat.id, get_text('about_text', lang), parse_mode='HTML')
     elif text == get_text('btn_settings', lang):
+        ai_mode_users.discard(uid)
         bot.send_message(message.chat.id, get_text('settings_menu', lang),
                          parse_mode='HTML', reply_markup=kb.settings_keyboard(lang))
+    elif text == get_text('btn_ai', lang):
+        # AI chatbot rejimiga kirish
+        ai_mode_users.add(uid)
+        if uid in user_states:
+            del user_states[uid]
+        bot.send_message(message.chat.id, get_text('ai_welcome', lang),
+                         parse_mode='HTML', reply_markup=kb.main_menu_keyboard(lang))
     elif text == get_text('btn_back_to_menu', lang):
-        # Order jarayonidan qaytish
-        if message.from_user.id in user_states:
-            del user_states[message.from_user.id]
+        # Order jarayonidan yoki AI rejimidan qaytish
+        ai_mode_users.discard(uid)
+        if uid in user_states:
+            del user_states[uid]
+        # AI sessiyasini tozalash
+        try:
+            from .chatbot import reset_chat_session
+            reset_chat_session(uid, lang)
+        except Exception:
+            pass
         bot.send_message(message.chat.id, get_text('main_menu', lang),
                          parse_mode='HTML', reply_markup=kb.main_menu_keyboard(lang))
     else:
+        # AI rejimida bo'lsa — Gemini ga yuborish
+        if uid in ai_mode_users:
+            handle_ai_message(message, lang)
+            return
         # Order jarayonidagi matn
-        uid = message.from_user.id
         if uid in user_states:
             state = user_states[uid]
             if state.get('step') == 'phone':
@@ -231,7 +259,7 @@ def handle_product(call):
 
 
 def show_product_detail(chat_id, product, lang):
-    """Mahsulot kartasini ko'rsatish"""
+    """Mahsulot kartasini ko'rsatish — rang/o'lcham/son tanlash bilan"""
     colors = product.colors.all()
     sizes = product.sizes.all()
     color_names = ", ".join([f"{c.emoji} {c.get_name(lang)}" for c in colors]) or "—"
@@ -255,6 +283,14 @@ def show_product_detail(chat_id, product, lang):
         description=product.get_description(lang) or "—"
     )
 
+    # Boshlang'ich tanlash holati
+    initial_color = colors[0].id if colors else 0
+    initial_size = sizes[0].id if sizes else 0
+    selector_kb = kb.product_selector_keyboard(
+        product, color_id=initial_color, size_id=initial_size,
+        ptype='d', qty=1, lang=lang
+    )
+
     media_group = []
     
     if product.main_image:
@@ -275,103 +311,147 @@ def show_product_detail(chat_id, product, lang):
     if len(media_group) > 1:
         try:
             bot.send_media_group(chat_id, media_group)
-            bot.send_message(chat_id, get_text('product_actions', lang), reply_markup=kb.product_detail_keyboard(product, lang))
+            bot.send_message(chat_id, get_text('product_actions', lang),
+                             reply_markup=selector_kb)
             return
         except Exception as e:
             print(f"Error sending media group: {e}")
     elif len(media_group) == 1:
         try:
             bot.send_photo(chat_id, media_group[0].media, caption=text, parse_mode='HTML',
-                           reply_markup=kb.product_detail_keyboard(product, lang))
+                           reply_markup=selector_kb)
             return
         except Exception:
             pass
 
     bot.send_message(chat_id, text, parse_mode='HTML',
-                     reply_markup=kb.product_detail_keyboard(product, lang))
+                     reply_markup=selector_kb)
 
 
 # =============================================
-# SAVATGA QO'SHISH JARAYONI
+# MAHSULOT SELECTOR HANDLERLARI
+# (rang, o'lcham, turi, son — hammasi bitta postda)
 # =============================================
 
-# 1) Rang tanlash
-@bot.callback_query_handler(func=lambda c: c.data.startswith('addcart_'))
-def handle_add_to_cart(call):
-    pid = int(call.data.split('_')[1])
+def _parse_selector_data(data):
+    """Selector callback_data ni parse qilish.
+    Format: prefix_pid_colorid_sizeid_ptype_qty
+    """
+    parts = data.split('_')
+    return {
+        'pid': int(parts[1]),
+        'color_id': int(parts[2]),
+        'size_id': int(parts[3]),
+        'ptype': parts[4],
+        'qty': int(parts[5]),
+    }
+
+
+def _refresh_selector(call, product, color_id, size_id, ptype, qty, lang):
+    """Selector klaviaturasini yangilash (faqat tugmalar)"""
+    new_kb = kb.product_selector_keyboard(
+        product, color_id=color_id, size_id=size_id,
+        ptype=ptype, qty=qty, lang=lang
+    )
+    try:
+        bot.edit_message_reply_markup(
+            call.message.chat.id, call.message.message_id,
+            reply_markup=new_kb
+        )
+    except Exception:
+        pass
+
+
+@bot.callback_query_handler(func=lambda c: c.data == 'noop')
+def handle_noop(call):
+    """Noop — label tugmalar uchun"""
+    bot.answer_callback_query(call.id)
+
+
+@bot.callback_query_handler(func=lambda c: c.data.startswith('pc_'))
+def handle_select_color(call):
+    """Rang tanlash"""
+    s = _parse_selector_data(call.data)
     lang = get_user_lang(call.from_user.id)
     try:
-        product = Product.objects.get(id=pid)
+        product = Product.objects.get(id=s['pid'])
     except Product.DoesNotExist:
         bot.answer_callback_query(call.id, get_text('product_not_found', lang))
         return
-    bot.edit_message_reply_markup(call.message.chat.id, call.message.message_id, reply_markup=None)
-    bot.send_message(call.message.chat.id, get_text('select_color', lang),
-                     reply_markup=kb.colors_keyboard(product, lang))
+    bot.answer_callback_query(call.id)
+    _refresh_selector(call, product, s['color_id'], s['size_id'], s['ptype'], s['qty'], lang)
 
 
-# 2) Rang tanlangandan keyin o'lcham
-@bot.callback_query_handler(func=lambda c: c.data.startswith('color_'))
-def handle_color_select(call):
-    parts = call.data.split('_')
-    pid = int(parts[1])
-    color_id = int(parts[2])
+@bot.callback_query_handler(func=lambda c: c.data.startswith('pz_'))
+def handle_select_size(call):
+    """O'lcham tanlash"""
+    s = _parse_selector_data(call.data)
     lang = get_user_lang(call.from_user.id)
     try:
-        product = Product.objects.get(id=pid)
+        product = Product.objects.get(id=s['pid'])
     except Product.DoesNotExist:
         bot.answer_callback_query(call.id, get_text('product_not_found', lang))
         return
-    bot.edit_message_text(get_text('select_size', lang),
-                          call.message.chat.id, call.message.message_id,
-                          reply_markup=kb.sizes_keyboard(product, color_id, lang))
+    bot.answer_callback_query(call.id)
+    _refresh_selector(call, product, s['color_id'], s['size_id'], s['ptype'], s['qty'], lang)
 
 
-# 3) O'lcham tanlangandan keyin dona/karobka
-@bot.callback_query_handler(func=lambda c: c.data.startswith('size_'))
-def handle_size_select(call):
-    parts = call.data.split('_')
-    pid = int(parts[1])
-    color_id = int(parts[2])
-    size_id = int(parts[3])
+@bot.callback_query_handler(func=lambda c: c.data.startswith('pt_'))
+def handle_toggle_type(call):
+    """Dona/Karobka tanlash"""
+    s = _parse_selector_data(call.data)
     lang = get_user_lang(call.from_user.id)
     try:
-        product = Product.objects.get(id=pid)
+        product = Product.objects.get(id=s['pid'])
     except Product.DoesNotExist:
         bot.answer_callback_query(call.id, get_text('product_not_found', lang))
         return
-    bot.edit_message_text(get_text('select_purchase_type', lang),
-                          call.message.chat.id, call.message.message_id,
-                          reply_markup=kb.purchase_type_keyboard(product, color_id, size_id, lang))
+    bot.answer_callback_query(call.id)
+    _refresh_selector(call, product, s['color_id'], s['size_id'], s['ptype'], s['qty'], lang)
 
 
-# 4) Dona/karobka tanlangandan keyin son
-@bot.callback_query_handler(func=lambda c: c.data.startswith('ptype_'))
-def handle_purchase_type(call):
-    parts = call.data.split('_')
-    pid = int(parts[1])
-    color_id = int(parts[2])
-    size_id = int(parts[3])
-    ptype = parts[4]
+@bot.callback_query_handler(func=lambda c: c.data.startswith('pi_'))
+def handle_inc_qty(call):
+    """Son oshirish (+)"""
+    s = _parse_selector_data(call.data)
     lang = get_user_lang(call.from_user.id)
-    bot.edit_message_text(get_text('select_quantity', lang),
-                          call.message.chat.id, call.message.message_id,
-                          reply_markup=kb.quantity_keyboard(pid, color_id, size_id, ptype, lang))
+    if s['qty'] >= 99:
+        bot.answer_callback_query(call.id, get_text('max_qty_toast', lang))
+        return
+    try:
+        product = Product.objects.get(id=s['pid'])
+    except Product.DoesNotExist:
+        bot.answer_callback_query(call.id, get_text('product_not_found', lang))
+        return
+    bot.answer_callback_query(call.id)
+    _refresh_selector(call, product, s['color_id'], s['size_id'], s['ptype'], s['qty'] + 1, lang)
 
 
-# 5) Son tanlash -> savatga qo'shish
-@bot.callback_query_handler(func=lambda c: c.data.startswith('qty_'))
-def handle_quantity(call):
-    parts = call.data.split('_')
-    pid = int(parts[1])
-    color_id = int(parts[2])
-    size_id = int(parts[3])
-    ptype = parts[4]
-    qty = int(parts[5])
+@bot.callback_query_handler(func=lambda c: c.data.startswith('pd_'))
+def handle_dec_qty(call):
+    """Son kamaytirish (-)"""
+    s = _parse_selector_data(call.data)
+    lang = get_user_lang(call.from_user.id)
+    if s['qty'] <= 1:
+        bot.answer_callback_query(call.id, get_text('min_qty_toast', lang))
+        return
+    try:
+        product = Product.objects.get(id=s['pid'])
+    except Product.DoesNotExist:
+        bot.answer_callback_query(call.id, get_text('product_not_found', lang))
+        return
+    bot.answer_callback_query(call.id)
+    _refresh_selector(call, product, s['color_id'], s['size_id'], s['ptype'], s['qty'] - 1, lang)
+
+
+@bot.callback_query_handler(func=lambda c: c.data.startswith('pa_'))
+def handle_add_to_cart_final(call):
+    """Savatga qo'shish — barcha tanlovlar tayyor"""
+    s = _parse_selector_data(call.data)
     lang = get_user_lang(call.from_user.id)
 
     try:
-        product = Product.objects.get(id=pid)
+        product = Product.objects.get(id=s['pid'])
     except Product.DoesNotExist:
         bot.answer_callback_query(call.id, get_text('product_not_found', lang))
         return
@@ -379,49 +459,34 @@ def handle_quantity(call):
     bot_user = get_or_create_user(call)
     cart = get_cart(bot_user)
 
+    # Rang va o'lcham
     color = None
-    color_name = "—"
-    if color_id > 0:
+    if s['color_id'] > 0:
         try:
-            color = ProductColor.objects.get(id=color_id)
-            color_name = f"{color.emoji} {color.get_name(lang)}"
+            color = ProductColor.objects.get(id=s['color_id'])
         except ProductColor.DoesNotExist:
             pass
 
     size = None
-    size_name = "—"
-    if size_id > 0:
+    if s['size_id'] > 0:
         try:
-            size = ProductSize.objects.get(id=size_id)
-            size_name = size.name
+            size = ProductSize.objects.get(id=s['size_id'])
         except ProductSize.DoesNotExist:
             pass
 
     # Savatga qo'shish
-    cart_item = CartItem.objects.create(
+    ptype = 'dona' if s['ptype'] == 'd' else 'karobka'
+    CartItem.objects.create(
         cart=cart,
         product=product,
         color=color,
         size=size,
-        quantity=qty,
+        quantity=s['qty'],
         purchase_type=ptype
     )
 
-    type_text = "Donalik" if ptype == 'dona' else "Karobkalik"
-    price = format_price(cart_item.get_subtotal())
-
-    bot.edit_message_text(
-        get_text('added_to_cart', lang).format(
-            product=product.get_name(lang),
-            color=color_name,
-            size=size_name,
-            type=type_text,
-            qty=qty,
-            price=price
-        ),
-        call.message.chat.id, call.message.message_id,
-        parse_mode='HTML'
-    )
+    # Toast xabar
+    bot.answer_callback_query(call.id, get_text('added_toast', lang), show_alert=True)
 
 
 # =============================================
@@ -698,9 +763,146 @@ def show_orders(chat_id, telegram_id, lang):
 @bot.callback_query_handler(func=lambda c: c.data == 'back_menu')
 def handle_back_menu(call):
     lang = get_user_lang(call.from_user.id)
+    ai_mode_users.discard(call.from_user.id)
     try:
         bot.delete_message(call.message.chat.id, call.message.message_id)
     except Exception:
         pass
     bot.send_message(call.message.chat.id, get_text('main_menu', lang),
                      parse_mode='HTML', reply_markup=kb.main_menu_keyboard(lang))
+
+
+# =============================================
+# AI CHATBOT HANDLER
+# =============================================
+
+AI_PRODUCTS_PER_PAGE = 5
+
+# AI qidiruv natijalari keshi (callback_data 64 bayt limiti tufayli)
+# {chat_id: product_ids_list}
+_ai_search_results = {}
+
+
+def handle_ai_message(message, lang):
+    """
+    AI rejimidagi foydalanuvchi xabarini Gemini ga yuborish.
+    Javobni matn + mahsulot tugmalari bilan ko'rsatish.
+    """
+    uid = message.from_user.id
+    chat_id = message.chat.id
+
+    # "Javob tayyorlanmoqda..." xabarini yuborish
+    thinking_msg = bot.send_message(
+        chat_id,
+        get_text('ai_thinking', lang),
+        parse_mode='HTML'
+    )
+
+    try:
+        from .chatbot import get_ai_response
+        result = get_ai_response(
+            user_id=uid,
+            message_text=message.text,
+            lang=lang
+        )
+
+        # "Javob tayyorlanmoqda" xabarini o'chirish
+        try:
+            bot.delete_message(chat_id, thinking_msg.message_id)
+        except Exception:
+            pass
+
+        ai_text = result['text']
+        product_ids = result['product_ids']
+
+        # 1. AI javob matnini yuborish
+        if len(ai_text) <= 4096:
+            bot.send_message(chat_id, ai_text, parse_mode='HTML')
+        else:
+            for i in range(0, len(ai_text), 4096):
+                bot.send_message(chat_id, ai_text[i:i + 4096], parse_mode='HTML')
+
+        # 2. Mahsulot tugmalarini ko'rsatish (agar mavjud bo'lsa)
+        if product_ids:
+            _ai_search_results[chat_id] = product_ids
+            _show_ai_products_page(chat_id, product_ids, 1, lang)
+
+    except Exception as e:
+        print(f"[AI HANDLER ERROR] {e}")
+        try:
+            bot.delete_message(chat_id, thinking_msg.message_id)
+        except Exception:
+            pass
+        bot.send_message(
+            chat_id,
+            get_text('ai_error', lang),
+            parse_mode='HTML',
+            reply_markup=kb.main_menu_keyboard(lang)
+        )
+
+
+def _show_ai_products_page(chat_id, product_ids, page, lang, message_id=None):
+    """AI topgan mahsulotlarni sahifalab ko'rsatish"""
+    products = Product.objects.filter(
+        id__in=product_ids, in_stock=True
+    ).select_related('category')
+
+    # ID lar tartibini saqlash
+    id_order = {pid: i for i, pid in enumerate(product_ids)}
+    products = sorted(products, key=lambda p: id_order.get(p.id, 999))
+
+    total = len(products)
+    if total == 0:
+        return
+
+    total_pages = math.ceil(total / AI_PRODUCTS_PER_PAGE)
+    page = max(1, min(page, total_pages))
+    start = (page - 1) * AI_PRODUCTS_PER_PAGE
+    page_products = products[start:start + AI_PRODUCTS_PER_PAGE]
+
+    text = get_text('ai_products_title', lang).format(
+        total=total, page=page, total_pages=total_pages
+    )
+
+    markup = kb.ai_products_keyboard(page_products, page, total_pages, lang)
+
+    if message_id:
+        try:
+            bot.edit_message_text(
+                text, chat_id, message_id,
+                parse_mode='HTML', reply_markup=markup
+            )
+            return
+        except Exception:
+            pass
+
+    bot.send_message(chat_id, text, parse_mode='HTML', reply_markup=markup)
+
+
+# AI mahsulot pagination
+@bot.callback_query_handler(func=lambda c: c.data.startswith('aipage_'))
+def handle_ai_page(call):
+    """AI mahsulotlar sahifasini almashtirish"""
+    page = int(call.data.split('_')[1])
+    chat_id = call.message.chat.id
+    lang = get_user_lang(call.from_user.id)
+    product_ids = _ai_search_results.get(chat_id, [])
+    if product_ids:
+        _show_ai_products_page(chat_id, product_ids, page, lang, call.message.message_id)
+    bot.answer_callback_query(call.id)
+
+
+# AI mahsulot detail
+@bot.callback_query_handler(func=lambda c: c.data.startswith('aiprod_'))
+def handle_ai_product(call):
+    """AI topgan mahsulotni ko'rsatish — savatga qo'shish imkoniyati bilan"""
+    pid = int(call.data.split('_')[1])
+    lang = get_user_lang(call.from_user.id)
+    try:
+        product = Product.objects.get(id=pid)
+    except Product.DoesNotExist:
+        bot.answer_callback_query(call.id, get_text('product_not_found', lang))
+        return
+    bot.answer_callback_query(call.id)
+    show_product_detail(call.message.chat.id, product, lang)
+

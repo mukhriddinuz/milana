@@ -57,9 +57,9 @@ TEXTS = {
         'en': "About us",
     },
     'btn_ai': {
-        'uz': "AI Yordamchi",
-        'ru': "AI Помощник",
-        'en': "AI Assistant",
+        'uz': "🤖 AI Yordamchi",
+        'ru': "🤖 AI Помощник",
+        'en': "🤖 AI Assistant",
     },
     'btn_settings': {
         'uz': "Sozlamalar",
@@ -439,6 +439,92 @@ TEXTS = {
         'uz': "-",
         'ru': "-",
         'en': "-",
+    },
+
+    # =============================================
+    # MAHSULOT SELECTOR (karta ichida tanlash)
+    # =============================================
+    'lbl_color': {
+        'uz': "🎨 Rang:",
+        'ru': "🎨 Цвет:",
+        'en': "🎨 Color:",
+    },
+    'lbl_size': {
+        'uz': "📏 O'lcham:",
+        'ru': "📏 Размер:",
+        'en': "📏 Size:",
+    },
+    'btn_dona': {
+        'uz': "Dona",
+        'ru': "Штука",
+        'en': "Unit",
+    },
+    'btn_karobka_short': {
+        'uz': "Karobka ({qty})",
+        'ru': "Коробка ({qty})",
+        'en': "Box ({qty})",
+    },
+    'added_toast': {
+        'uz': "✅ Savatga qo'shildi!",
+        'ru': "✅ Добавлено в корзину!",
+        'en': "✅ Added to cart!",
+    },
+    'max_qty_toast': {
+        'uz': "Maksimum 99 ta",
+        'ru': "Максимум 99 шт",
+        'en': "Maximum 99 pcs",
+    },
+    'min_qty_toast': {
+        'uz': "Minimum 1 ta",
+        'ru': "Минимум 1 шт",
+        'en': "Minimum 1 pc",
+    },
+    # =============================================
+    # AI CHATBOT
+    # =============================================
+    'ai_welcome': {
+        'uz': (
+            "🤖 <b>AI Yordamchi</b>\n\n"
+            "Men sizga kiyim tanlashda yordam beraman!\n\n"
+            "Menga qanday kiyim izlayotganingizni yozing, masalan:\n"
+            "• \"Erkaklar uchun qishki kurtka\"\n"
+            "• \"Ayollar ko'ylagi, qizil rang, M o'lcham\"\n"
+            "• \"Bolalar uchun yozgi kiyimlar\"\n\n"
+            "Chiqish uchun <b>Asosiy menyu</b> tugmasini bosing."
+        ),
+        'ru': (
+            "🤖 <b>AI Помощник</b>\n\n"
+            "Я помогу вам подобрать одежду!\n\n"
+            "Напишите, что вы ищете, например:\n"
+            "• \"Мужская зимняя куртка\"\n"
+            "• \"Женское платье, красное, размер M\"\n"
+            "• \"Детская летняя одежда\"\n\n"
+            "Для выхода нажмите <b>Главное меню</b>."
+        ),
+        'en': (
+            "🤖 <b>AI Assistant</b>\n\n"
+            "I can help you find clothing!\n\n"
+            "Tell me what you're looking for, e.g.:\n"
+            "• \"Men's winter jacket\"\n"
+            "• \"Women's dress, red, size M\"\n"
+            "• \"Kids' summer clothes\"\n\n"
+            "Press <b>Main menu</b> to exit."
+        ),
+    },
+    'ai_thinking': {
+        'uz': "🤖 Javob tayyorlanmoqda...",
+        'ru': "🤖 Готовлю ответ...",
+        'en': "🤖 Preparing answer...",
+    },
+    'ai_error': {
+        'uz': "Kechirasiz, xatolik yuz berdi. Qaytadan yozing.",
+        'ru': "Извините, произошла ошибка. Напишите снова.",
+        'en': "Sorry, an error occurred. Please try again.",
+    },
+    'ai_products_title': {
+        'uz': "📋 <b>Topilgan mahsulotlar</b> ({total} ta)\nSahifa: {page}/{total_pages}\n\nTanlang:",
+        'ru': "📋 <b>Найденные товары</b> ({total} шт)\nСтраница: {page}/{total_pages}\n\nВыберите:",
+        'en': "📋 <b>Found products</b> ({total} items)\nPage: {page}/{total_pages}\n\nSelect:",
     },
 }
 

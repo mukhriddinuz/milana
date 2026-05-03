@@ -134,6 +134,11 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 TELEGRAM_BOT_TOKEN = config('TELEGRAM_BOT_TOKEN', default='')
 TELEGRAM_WEBHOOK_URL = config('TELEGRAM_WEBHOOK_URL', default='')  # https://your-domain.com
 
+# =============================================
+# GEMINI AI SOZLAMALARI
+# =============================================
+GEMINI_API_KEY = config('GEMINI_API_KEY', default='')
+
 # CSRF trusted origins (webhook uchun)
 CSRF_TRUSTED_ORIGINS = [
     config('TELEGRAM_WEBHOOK_URL', default='https://localhost'),

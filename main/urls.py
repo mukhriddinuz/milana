@@ -17,4 +17,8 @@ urlpatterns = [
 
     # Bot info (GET)
     path('info/', views.bot_info, name='bot-info'),
+
+    # Gemini AI Chatbot API
+    path('chatbot/', views.chatbot_api, name='chatbot-api'),
+    path('chatbot/reset/', views.chatbot_reset, name='chatbot-reset'),
 ]
