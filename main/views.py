@@ -11,6 +11,7 @@ from django.views.decorators.http import require_POST, require_GET
 from django.conf import settings
 
 from .bot import bot
+from .notifications import notify_admin_error
 
 
 @csrf_exempt
@@ -28,6 +29,11 @@ def telegram_webhook(request):
     except Exception as e:
         # Log the error but return 200 to prevent Telegram from retrying
         print(f"[WEBHOOK ERROR] {e}")
+        notify_admin_error(
+            title='Telegram webhook xatoligi',
+            error=e,
+            extra=request.body.decode('utf-8', errors='ignore')[:1500]
+        )
 
     return JsonResponse({'status': 'ok'})
 
@@ -64,6 +70,11 @@ def set_webhook(request):
                 'message': 'Webhook o\'rnatishda xatolik yuz berdi'
             }, status=500)
     except Exception as e:
+        notify_admin_error(
+            title='Webhook o‘rnatish xatoligi',
+            error=e,
+            extra=f"webhook_url={webhook_url}"
+        )
         return JsonResponse({
             'status': 'error',
             'message': f'Xatolik: {str(e)}'
@@ -98,6 +109,10 @@ def bot_info(request):
             'is_bot': me.is_bot,
         })
     except Exception as e:
+        notify_admin_error(
+            title='Bot info xatoligi',
+            error=e
+        )
         return JsonResponse({
             'status': 'error',
             'message': str(e)

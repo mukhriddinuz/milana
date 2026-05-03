@@ -17,6 +17,7 @@ import google.generativeai as genai
 from django.conf import settings
 from django.db.models import Q
 from .models import Product, Category
+from .notifications import notify_admin_error
 
 
 # =============================================
@@ -418,6 +419,12 @@ def get_ai_response(user_id, message_text, lang='uz'):
         session_key = f"{user_id}_{lang}"
         if session_key in _chat_sessions:
             del _chat_sessions[session_key]
+
+        notify_admin_error(
+            title='AI Chatbot xatoligi',
+            error=e,
+            extra=f"user_id={user_id}\nlang={lang}\nmessage={message_text}"
+        )
 
         error_str = str(e).lower()
         if '429' in error_str or 'resource' in error_str:

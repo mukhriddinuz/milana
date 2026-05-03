@@ -9,6 +9,7 @@ from .models import (
     BotUser, Category, Product, ProductColor, ProductSize,
     Cart, CartItem, Order, OrderItem
 )
+from .notifications import notify_admin_error
 from .translations import get_text
 from .utils import get_or_create_user, get_user_lang, get_cart, t, format_price
 from . import keyboards as kb
@@ -829,6 +830,11 @@ def handle_ai_message(message, lang):
 
     except Exception as e:
         print(f"[AI HANDLER ERROR] {e}")
+        notify_admin_error(
+            title='AI handler xatoligi',
+            error=e,
+            extra=f"chat_id={chat_id}\nuser_id={uid}\nlang={lang}\nmessage={message.text}"
+        )
         try:
             bot.delete_message(chat_id, thinking_msg.message_id)
         except Exception:
@@ -905,4 +911,3 @@ def handle_ai_product(call):
         return
     bot.answer_callback_query(call.id)
     show_product_detail(call.message.chat.id, product, lang)
-

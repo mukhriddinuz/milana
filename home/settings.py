@@ -10,8 +10,9 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/6.0/ref/settings/
 """
 
-import os
 from pathlib import Path
+from urllib.parse import urlparse
+import importlib.util
 from decouple import config
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -27,7 +28,15 @@ SECRET_KEY = config('DJANGO_SECRET_KEY', default='django-insecure-d$pp@-*t$m2uw2
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = config('DEBUG', default=True, cast=bool)
 
-ALLOWED_HOSTS = ['*']
+PRIMARY_DOMAIN = 'milana.mukhriddin.uz'
+TELEGRAM_WEBHOOK_URL = config('TELEGRAM_WEBHOOK_URL', default='')
+HAS_CORSHEADERS = importlib.util.find_spec('corsheaders') is not None
+
+ALLOWED_HOSTS = [
+    PRIMARY_DOMAIN,
+    'localhost',
+    '127.0.0.1',
+]
 
 
 # Application definition
@@ -43,6 +52,9 @@ INSTALLED_APPS = [
     'main',
 ]
 
+if HAS_CORSHEADERS:
+    INSTALLED_APPS.insert(0, 'corsheaders')
+
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
@@ -52,6 +64,9 @@ MIDDLEWARE = [
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
+
+if HAS_CORSHEADERS:
+    MIDDLEWARE.insert(2, 'corsheaders.middleware.CorsMiddleware')
 
 ROOT_URLCONF = 'home.urls'
 
@@ -72,6 +87,30 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'home.wsgi.application'
 
+
+def _origin_from_url(url):
+    parsed = urlparse(url)
+    if parsed.scheme and parsed.netloc:
+        return f'{parsed.scheme}://{parsed.netloc}'
+    return None
+
+
+CSRF_TRUSTED_ORIGINS = [
+    f'https://{PRIMARY_DOMAIN}',
+]
+
+_webhook_origin = _origin_from_url(TELEGRAM_WEBHOOK_URL)
+if _webhook_origin and _webhook_origin not in CSRF_TRUSTED_ORIGINS:
+    CSRF_TRUSTED_ORIGINS.append(_webhook_origin)
+
+if HAS_CORSHEADERS:
+    CORS_ALLOWED_ORIGINS = [
+        f'https://{PRIMARY_DOMAIN}',
+    ]
+    CORS_ALLOW_CREDENTIALS = True
+
+CSRF_COOKIE_SECURE = True
+SESSION_COOKIE_SECURE = True
 
 # Database
 # https://docs.djangoproject.com/en/6.0/ref/settings/#databases
@@ -132,14 +171,10 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 # TELEGRAM BOT SOZLAMALARI
 # =============================================
 TELEGRAM_BOT_TOKEN = config('TELEGRAM_BOT_TOKEN', default='')
-TELEGRAM_WEBHOOK_URL = config('TELEGRAM_WEBHOOK_URL', default='')  # https://your-domain.com
+ADMIN_TELEGRAM_ID = config('ADMIN_TELEGRAM_ID', default=0, cast=int)
 
 # =============================================
 # GEMINI AI SOZLAMALARI
 # =============================================
 GEMINI_API_KEY = config('GEMINI_API_KEY', default='')
 
-# CSRF trusted origins (webhook uchun)
-CSRF_TRUSTED_ORIGINS = [
-    config('TELEGRAM_WEBHOOK_URL', default='https://localhost'),
-]
